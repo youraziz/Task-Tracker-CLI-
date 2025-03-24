@@ -1,2 +1,196 @@
 # Task-Tracker-CLI-
 https://roadmap.sh/projects/task-tracker
+#!/usr/bin/env python3
+"""
+Task Tracker CLI Application
+
+A simple command-line tool to track and manage your tasks.
+"""
+
+import os
+import json
+import sys
+import datetime
+import uuid
+
+
+class TaskTracker:
+    """A class to manage tasks in a JSON file."""
+
+    def __init__(self, file_path="tasks.json"):
+        """Initialize the TaskTracker with a file path."""
+        self.file_path = file_path
+        self.tasks = self._load_tasks()
+
+    def _load_tasks(self):
+        """Load tasks from the JSON file, or create a new file if it doesn't exist."""
+        if os.path.exists(self.file_path):
+            try:
+                with open(self.file_path, "r") as file:
+                    return json.load(file)
+            except json.JSONDecodeError:
+                # If the file exists but is empty or invalid
+                return []
+        else:
+            # Create a new file with an empty task list
+            with open(self.file_path, "w") as file:
+                json.dump([], file)
+            return []
+
+    def _save_tasks(self):
+        """Save tasks to the JSON file."""
+        with open(self.file_path, "w") as file:
+            json.dump(self.tasks, file, indent=2)
+
+    def add_task(self, description):
+        """Add a new task with the given description."""
+        current_time = datetime.datetime.now().isoformat()
+        new_task = {
+            "id": str(uuid.uuid4()),
+            "description": description,
+            "status": "todo",
+            "createdAt": current_time,
+            "updatedAt": current_time
+        }
+        self.tasks.append(new_task)
+        self._save_tasks()
+        print(f"Task added: {description}")
+
+    def update_task(self, task_id, description=None, status=None):
+        """Update a task's description or status."""
+        for task in self.tasks:
+            if task["id"] == task_id:
+                if description:
+                    task["description"] = description
+                if status and status in ["todo", "in progress", "done"]:
+                    task["status"] = status
+                task["updatedAt"] = datetime.datetime.now().isoformat()
+                self._save_tasks()
+                print(f"Task updated: {task['description']}")
+                return
+        print(f"Task with ID {task_id} not found.")
+
+    def delete_task(self, task_id):
+        """Delete a task by its ID."""
+        initial_length = len(self.tasks)
+        self.tasks = [task for task in self.tasks if task["id"] != task_id]
+        
+        if len(self.tasks) < initial_length:
+            self._save_tasks()
+            print(f"Task with ID {task_id} deleted.")
+        else:
+            print(f"Task with ID {task_id} not found.")
+
+    def mark_in_progress(self, task_id):
+        """Mark a task as in progress."""
+        self.update_task(task_id, status="in progress")
+
+    def mark_done(self, task_id):
+        """Mark a task as done."""
+        self.update_task(task_id, status="done")
+
+    def list_all_tasks(self):
+        """List all tasks."""
+        if not self.tasks:
+            print("No tasks found.")
+            return
+        
+        print("\nAll Tasks:")
+        print("-" * 80)
+        for task in self.tasks:
+            print(f"ID: {task['id']}")
+            print(f"Description: {task['description']}")
+            print(f"Status: {task['status']}")
+            print(f"Created: {task['createdAt']}")
+            print(f"Updated: {task['updatedAt']}")
+            print("-" * 80)
+
+    def list_tasks_by_status(self, status):
+        """List tasks filtered by status."""
+        filtered_tasks = [task for task in self.tasks if task["status"] == status]
+        
+        if not filtered_tasks:
+            print(f"No tasks with status '{status}' found.")
+            return
+        
+        print(f"\nTasks with status '{status}':")
+        print("-" * 80)
+        for task in filtered_tasks:
+            print(f"ID: {task['id']}")
+            print(f"Description: {task['description']}")
+            print(f"Created: {task['createdAt']}")
+            print(f"Updated: {task['updatedAt']}")
+            print("-" * 80)
+
+
+def print_usage():
+    """Print usage instructions for the application."""
+    print("\nTask Tracker - Usage Instructions:")
+    print("  python task_tracker.py add \"Task description\"                - Add a new task")
+    print("  python task_tracker.py update <task_id> \"New description\"    - Update task description")
+    print("  python task_tracker.py status <task_id> <todo|in progress|done> - Update task status")
+    print("  python task_tracker.py delete <task_id>                       - Delete a task")
+    print("  python task_tracker.py progress <task_id>                     - Mark task as in progress")
+    print("  python task_tracker.py done <task_id>                         - Mark task as done")
+    print("  python task_tracker.py list                                   - List all tasks")
+    print("  python task_tracker.py list-done                              - List completed tasks")
+    print("  python task_tracker.py list-todo                              - List tasks to do")
+    print("  python task_tracker.py list-progress                          - List tasks in progress")
+    print("  python task_tracker.py help                                   - Show this help message")
+
+
+def main():
+    """Main function to handle command line arguments and execute corresponding actions."""
+    tracker = TaskTracker()
+    
+    if len(sys.argv) < 2 or sys.argv[1] == "help":
+        print_usage()
+        return
+
+    command = sys.argv[1].lower()
+
+    try:
+        if command == "add" and len(sys.argv) >= 3:
+            tracker.add_task(sys.argv[2])
+        
+        elif command == "update" and len(sys.argv) >= 4:
+            tracker.update_task(sys.argv[2], description=sys.argv[3])
+        
+        elif command == "status" and len(sys.argv) >= 4:
+            if sys.argv[3] not in ["todo", "in progress", "done"]:
+                print("Invalid status. Use 'todo', 'in progress', or 'done'.")
+                return
+            tracker.update_task(sys.argv[2], status=sys.argv[3])
+        
+        elif command == "delete" and len(sys.argv) >= 3:
+            tracker.delete_task(sys.argv[2])
+        
+        elif command == "progress" and len(sys.argv) >= 3:
+            tracker.mark_in_progress(sys.argv[2])
+        
+        elif command == "done" and len(sys.argv) >= 3:
+            tracker.mark_done(sys.argv[2])
+        
+        elif command == "list":
+            tracker.list_all_tasks()
+        
+        elif command == "list-done":
+            tracker.list_tasks_by_status("done")
+        
+        elif command == "list-todo":
+            tracker.list_tasks_by_status("todo")
+        
+        elif command == "list-progress":
+            tracker.list_tasks_by_status("in progress")
+        
+        else:
+            print("Invalid command or missing arguments.")
+            print_usage()
+    
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        print_usage()
+
+
+if __name__ == "__main__":
+    main()
